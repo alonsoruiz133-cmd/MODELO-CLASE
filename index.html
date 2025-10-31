@@ -65,7 +65,7 @@
 
       // --- Cargar modelo FBX ---
       const loader = new THREE.FBXLoader();
-      loader.load('Models/idle.fbx', (obj) => {
+      loader.load('MODELO-CLASE/Models/idle.fbx', (obj) => {
         player = obj;
         player.scale.set(0.01,0.01,0.01);
         player.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -163,6 +163,7 @@
   </script>
 </body>
 </html>
+
 
 
 
