@@ -65,7 +65,7 @@
 
       // --- Cargar modelo FBX ---
       const loader = new THREE.FBXLoader();
-      loader.load('MODELO-CLASE/Models/idle.fbx', (obj) => {
+      loader.load('MODELO-CLASE/Models/Idle.fbx', (obj) => {
         player = obj;
         player.scale.set(0.01,0.01,0.01);
         player.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -77,8 +77,8 @@
         activeAction = actions.idle;
 
         // Cargar otras animaciones
-        loader.load('Models/walk.fbx', (w) => actions.walk = mixer.clipAction(w.animations[0]));
-        loader.load('Models/run.fbx', (r) => actions.run = mixer.clipAction(r.animations[0]));
+        loader.load('Models/Walk.fbx', (w) => actions.walk = mixer.clipAction(w.animations[0]));
+        loader.load('Models/Run.fbx', (r) => actions.run = mixer.clipAction(r.animations[0]));
       });
 
       window.addEventListener('resize', onResize);
@@ -163,6 +163,7 @@
   </script>
 </body>
 </html>
+
 
 
 
