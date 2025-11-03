@@ -1,168 +1,164 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Animación FBX - Control WASD</title>
+  <title>Movimiento 3D con Teclado — Three.js (FBX)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { margin: 0; overflow: hidden; background: #000; color: white; font-family: Arial, sans-serif; }
-    #ui {
-      position: absolute;
-      top: 10px; left: 10px;
-      background: rgba(0,0,0,0.5);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 10;
+    body,html { margin:0; height:100%; overflow:hidden; background:#111; color:#eee; font-family:sans-serif; }
+    #info {
+      position:absolute; top:10px; left:10px; z-index:10;
+      background:rgba(0,0,0,0.5); padding:8px 12px; border-radius:6px;
+      font-size:13px;
     }
+    canvas { display:block; }
   </style>
 </head>
 <body>
-  <div id="ui">Controles: WASD para moverte • Q/E girar • R reiniciar</div>
+  <div id="info">W/A/S/D — Mueve el modelo | Shift — Correr</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/FBXLoader.js"></script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@latest/build/three.module.js';
+    import { FBXLoader } from 'https://unpkg.com/three@latest/examples/jsm/loaders/FBXLoader.js';
+    import { OrbitControls } from 'https://unpkg.com/three@latest/examples/jsm/controls/OrbitControls.js';
 
+    // --- ESCENA ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x20232a);
 
-  
-  <script>
-    let scene, camera, renderer, clock, mixer;
-    const keys = { w:false, a:false, s:false, d:false, q:false, e:false };
-    let player, actions = {}, activeAction, velocity = new THREE.Vector3();
+    // --- CAMARA ---
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
+    camera.position.set(0, 5, 10);
 
-    init();
-    animate();
+    // --- RENDERER ---
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
 
-    function init() {
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x87ceeb);
+    // --- LUCES ---
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemi.position.set(0, 50, 0);
+    scene.add(hemi);
 
-      camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-      camera.position.set(0, 4, 10);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(5, 10, 7.5);
+    dir.castShadow = true;
+    scene.add(dir);
 
-      renderer = new THREE.WebGLRenderer({antialias:true});
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.shadowMap.enabled = true;
-      document.body.appendChild(renderer.domElement);
+    // --- PLANO (suelo) ---
+    const planeGeo = new THREE.PlaneGeometry(100, 100);
+    const planeMat = new THREE.MeshStandardMaterial({ color: 0x7a7a7a, roughness: 1 });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.receiveShadow = true;
+    scene.add(plane);
 
-      const light = new THREE.DirectionalLight(0xffffff, 1);
-      light.position.set(5,10,7);
-      light.castShadow = true;
-      scene.add(light);
+    // --- CONTROLES ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.5, 0);
+    controls.update();
 
-      const amb = new THREE.AmbientLight(0xffffff, 0.4);
-      scene.add(amb);
+    // --- VARIABLES ---
+    const loader = new FBXLoader();
+    let model, mixer;
+    const actions = {};
+    let activeAction;
 
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(200,200),
-        new THREE.MeshStandardMaterial({color:0x4c8a4c})
-      );
-      ground.rotation.x = -Math.PI/2;
-      ground.receiveShadow = true;
-      scene.add(ground);
+    // --- FUNCION PARA CAMBIAR ANIMACION ---
+    function setAction(name) {
+      if (activeAction === actions[name]) return;
+      if (activeAction) activeAction.fadeOut(0.3);
+      activeAction = actions[name];
+      if (activeAction) activeAction.reset().fadeIn(0.3).play();
+    }
 
-      clock = new THREE.Clock();
+    // --- CARGA DE MODELOS ---
+    loader.load('models/Idle.fbx', (fbx) => {
+      model = fbx;
+      model.scale.setScalar(0.01); // ajusta según tamaño
+      model.traverse(c => { if (c.isMesh) c.castShadow = true; });
+      scene.add(model);
 
-      // --- Cargar modelo FBX ---
-      const loader = new THREE.FBXLoader();
-      loader.load('Models/Idle.fbx', (obj) => {
-        player = obj;
-        player.scale.set(0.01,0.01,0.01);
-        player.traverse(o => { if (o.isMesh) o.castShadow = true; });
-        scene.add(player);
+      mixer = new THREE.AnimationMixer(model);
+      actions.idle = mixer.clipAction(fbx.animations[0]);
+      actions.idle.play();
 
-        mixer = new THREE.AnimationMixer(player);
-        actions.idle = mixer.clipAction(obj.animations[0]);
-        actions.idle.play();
-        activeAction = actions.idle;
-
-        // Cargar otras animaciones
-        loader.load('Models/Walking .fbx', (w) => actions.walk = mixer.clipAction(w.animations[0]));
-        loader.load('Models/Running Arc.fbx', (r) => actions.run = mixer.clipAction(r.animations[0]));
+      // Cargar las demás animaciones
+      loader.load('models/Walking .fbx', (walk) => {
+        actions.walk = mixer.clipAction(walk.animations[0]);
       });
 
-      window.addEventListener('resize', onResize);
-      window.addEventListener('keydown', keyDown);
-      window.addEventListener('keyup', keyUp);
-    }
+      loader.load('models/RunningArc.fbx', (run) => {
+        actions.run = mixer.clipAction(run.animations[0]);
+      });
+    });
 
-    function keyDown(e) {
-      switch(e.key.toLowerCase()) {
-        case 'w': keys.w = true; break;
-        case 'a': keys.a = true; break;
-        case 's': keys.s = true; break;
-        case 'd': keys.d = true; break;
-        case 'q': keys.q = true; break;
-        case 'e': keys.e = true; break;
-        case 'r': if(player) resetPosition(); break;
+    // --- MOVIMIENTO ---
+    const keys = { forward:false, back:false, left:false, right:false, shift:false };
+    window.addEventListener('keydown', (e) => {
+      switch(e.code){
+        case 'KeyW': case 'ArrowUp': keys.forward = true; break;
+        case 'KeyS': case 'ArrowDown': keys.back = true; break;
+        case 'KeyA': case 'ArrowLeft': keys.left = true; break;
+        case 'KeyD': case 'ArrowRight': keys.right = true; break;
+        case 'ShiftLeft': case 'ShiftRight': keys.shift = true; break;
       }
-    }
-
-    function keyUp(e) {
-      switch(e.key.toLowerCase()) {
-        case 'w': keys.w = false; break;
-        case 'a': keys.a = false; break;
-        case 's': keys.s = false; break;
-        case 'd': keys.d = false; break;
-        case 'q': keys.q = false; break;
-        case 'e': keys.e = false; break;
+    });
+    window.addEventListener('keyup', (e) => {
+      switch(e.code){
+        case 'KeyW': case 'ArrowUp': keys.forward = false; break;
+        case 'KeyS': case 'ArrowDown': keys.back = false; break;
+        case 'KeyA': case 'ArrowLeft': keys.left = false; break;
+        case 'KeyD': case 'ArrowRight': keys.right = false; break;
+        case 'ShiftLeft': case 'ShiftRight': keys.shift = false; break;
       }
-    }
+    });
 
-    function resetPosition() {
-      player.position.set(0,0,0);
-      player.rotation.set(0,0,0);
-      velocity.set(0,0,0);
-      switchAnimation('idle');
-    }
-
-    function switchAnimation(name) {
-      if (!actions[name] || activeAction === actions[name]) return;
-      activeAction.fadeOut(0.3);
-      activeAction = actions[name];
-      activeAction.reset().fadeIn(0.3).play();
-    }
-
-    function updateMovement(delta) {
-      if (!player) return;
-
-      const moveSpeed = keys.w ? 5 : 0;
-      const rotationSpeed = 2.5;
-
-      if (keys.q) player.rotation.y += rotationSpeed * delta;
-      if (keys.e) player.rotation.y -= rotationSpeed * delta;
-
-      if (keys.w) {
-        const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);
-        player.position.addScaledVector(forward, moveSpeed * delta);
-        switchAnimation('walk');
-      } else {
-        switchAnimation('idle');
-      }
-
-      if (mixer) mixer.update(delta);
-      camera.position.lerp(
-        player.position.clone().add(new THREE.Vector3(0, 3, 8).applyQuaternion(player.quaternion)),
-        0.1
-      );
-      camera.lookAt(player.position);
-    }
+    // --- ANIMACION PRINCIPAL ---
+    const clock = new THREE.Clock();
 
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
-      updateMovement(delta);
+
+      if (mixer) mixer.update(delta);
+
+      if (model) {
+        const speed = keys.shift ? 10 : 5;
+        const move = new THREE.Vector3();
+
+        if (keys.forward) move.z -= 1;
+        if (keys.back) move.z += 1;
+        if (keys.left) move.x -= 1;
+        if (keys.right) move.x += 1;
+
+        if (move.lengthSq() > 0) {
+          move.normalize().multiplyScalar(speed * delta);
+          model.position.add(move);
+          model.lookAt(model.position.x - move.x, model.position.y, model.position.z - move.z);
+          if (keys.shift) setAction('run');
+          else setAction('walk');
+        } else {
+          setAction('idle');
+        }
+      }
+
+      controls.update();
       renderer.render(scene, camera);
     }
 
-    function onResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+      renderer.setSize(innerWidth, innerHeight);
+    });
   </script>
 </body>
 </html>
+
 
 
 
